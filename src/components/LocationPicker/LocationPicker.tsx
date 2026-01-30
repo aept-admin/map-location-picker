@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { Crosshair, MapPin, Check } from "lucide-react";
+import { Crosshair, MapPin, Check, Navigation, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "./SearchInput";
-import { AddressForm } from "./AddressForm";
-import { CoordinatesDisplay } from "./CoordinatesDisplay";
 import { MapView } from "./MapView";
 import { SuggestionsList } from "./SuggestionsList";
 import { useGoogleMaps } from "./useGoogleMaps";
 import { LocationData, Coordinates } from "./types";
+import { toast } from "sonner";
 
 interface LocationPickerProps {
   apiKey: string;
@@ -39,7 +38,6 @@ export const LocationPicker = ({
     selectPlace,
     updateCoordinates,
     useCurrentLocation,
-    setAddress,
   } = useGoogleMaps({
     apiKey,
     defaultCenter,
@@ -87,6 +85,13 @@ export const LocationPicker = ({
     });
   }, [coordinates, address, onConfirm]);
 
+  const copyToClipboard = useCallback((text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  }, []);
+
+  const fullAddress = address.formattedAddress || "Search for a location...";
+
   if (error) {
     return (
       <div className="location-card flex flex-col items-center justify-center gap-4 p-8 text-center">
@@ -102,8 +107,8 @@ export const LocationPicker = ({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Search Section */}
+    <div className="flex flex-col gap-4">
+      {/* Search Section - Google Maps style */}
       <div className="relative">
         <SearchInput
           value={searchValue}
@@ -150,20 +155,79 @@ export const LocationPicker = ({
         )}
       </div>
 
-      {/* Coordinates Display */}
-      <CoordinatesDisplay coordinates={coordinates} />
+      {/* Selected Location Details - Clean Display */}
+      <div className="location-card space-y-4">
+        {/* Full Address */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <MapPin className="w-4 h-4 text-primary" />
+              Full Address
+            </div>
+            {address.formattedAddress && (
+              <button
+                onClick={() => copyToClipboard(address.formattedAddress, "Address")}
+                className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                title="Copy address"
+              >
+                <Copy className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+          <p className="text-foreground font-medium text-lg leading-relaxed">
+            {fullAddress}
+          </p>
+        </div>
 
-      {/* Address Form */}
-      <div className="location-card">
-        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-primary" />
-          Address Details
-        </h3>
-        <AddressForm address={address} onChange={setAddress} />
+        {/* Coordinates */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-border">
+          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-accent/50 rounded-lg">
+            <Navigation className="w-4 h-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs text-muted-foreground block">Latitude</span>
+              <span className="font-mono font-medium text-foreground">{coordinates.lat.toFixed(6)}</span>
+            </div>
+            <button
+              onClick={() => copyToClipboard(coordinates.lat.toFixed(6), "Latitude")}
+              className="p-1.5 hover:bg-background rounded-lg transition-colors"
+              title="Copy latitude"
+            >
+              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-accent/50 rounded-lg">
+            <Navigation className="w-4 h-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-xs text-muted-foreground block">Longitude</span>
+              <span className="font-mono font-medium text-foreground">{coordinates.lng.toFixed(6)}</span>
+            </div>
+            <button
+              onClick={() => copyToClipboard(coordinates.lng.toFixed(6), "Longitude")}
+              className="p-1.5 hover:bg-background rounded-lg transition-colors"
+              title="Copy longitude"
+            >
+              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {/* Copy All Button */}
+        {address.formattedAddress && (
+          <button
+            onClick={() => copyToClipboard(
+              `Address: ${address.formattedAddress}\nLatitude: ${coordinates.lat.toFixed(6)}\nLongitude: ${coordinates.lng.toFixed(6)}`,
+              "Location details"
+            )}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+          >
+            <Copy className="w-4 h-4" />
+            Copy all details
+          </button>
+        )}
       </div>
 
       {/* Confirm Button */}
-      <Button onClick={handleConfirm} className="h-12 text-base font-medium">
+      <Button onClick={handleConfirm} className="h-12 text-base font-medium" disabled={!address.formattedAddress}>
         <Check className="w-5 h-5 mr-2" />
         Confirm Location
       </Button>
