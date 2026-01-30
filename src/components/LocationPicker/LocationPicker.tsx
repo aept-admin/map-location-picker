@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { Crosshair, MapPin, Check, Navigation, Copy } from "lucide-react";
+import { Crosshair, MapPin, Check, Navigation, Copy, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { SearchInput } from "./SearchInput";
 import { MapView } from "./MapView";
 import { SuggestionsList } from "./SuggestionsList";
@@ -23,6 +24,8 @@ export const LocationPicker = ({
 }: LocationPickerProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [editedAddress, setEditedAddress] = useState("");
 
   const {
     isLoaded,
@@ -43,6 +46,12 @@ export const LocationPicker = ({
     defaultCenter,
     onLocationChange,
   });
+
+  // Sync edited address with fetched address
+  useEffect(() => {
+    setEditedAddress(address.formattedAddress);
+    setIsEditingAddress(false);
+  }, [address.formattedAddress]);
 
   // Debounced search
   useEffect(() => {
@@ -79,18 +88,37 @@ export const LocationPicker = ({
   );
 
   const handleConfirm = useCallback(() => {
+    const finalAddress = {
+      ...address,
+      formattedAddress: editedAddress || address.formattedAddress,
+    };
     onConfirm?.({
       coordinates,
-      address,
+      address: finalAddress,
     });
-  }, [coordinates, address, onConfirm]);
+  }, [coordinates, address, editedAddress, onConfirm]);
 
   const copyToClipboard = useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
   }, []);
 
-  const fullAddress = address.formattedAddress || "Search for a location...";
+  const handleStartEdit = useCallback(() => {
+    setEditedAddress(address.formattedAddress);
+    setIsEditingAddress(true);
+  }, [address.formattedAddress]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditedAddress(address.formattedAddress);
+    setIsEditingAddress(false);
+  }, [address.formattedAddress]);
+
+  const handleSaveEdit = useCallback(() => {
+    setIsEditingAddress(false);
+    toast.success("Address updated");
+  }, []);
+
+  const displayAddress = editedAddress || address.formattedAddress || "Search for a location...";
 
   if (error) {
     return (
@@ -164,19 +192,58 @@ export const LocationPicker = ({
               <MapPin className="w-4 h-4 text-primary" />
               Full Address
             </div>
-            {address.formattedAddress && (
-              <button
-                onClick={() => copyToClipboard(address.formattedAddress, "Address")}
-                className="p-1.5 hover:bg-accent rounded-lg transition-colors"
-                title="Copy address"
-              >
-                <Copy className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
+            <div className="flex items-center gap-1">
+              {!isEditingAddress && address.formattedAddress && (
+                <>
+                  <button
+                    onClick={handleStartEdit}
+                    className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                    title="Edit address"
+                  >
+                    <Pencil className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(displayAddress, "Address")}
+                    className="p-1.5 hover:bg-accent rounded-lg transition-colors"
+                    title="Copy address"
+                  >
+                    <Copy className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </>
+              )}
+              {isEditingAddress && (
+                <>
+                  <button
+                    onClick={handleSaveEdit}
+                    className="p-1.5 hover:bg-primary/10 rounded-lg transition-colors"
+                    title="Save changes"
+                  >
+                    <Check className="w-4 h-4 text-primary" />
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors"
+                    title="Cancel editing"
+                  >
+                    <X className="w-4 h-4 text-destructive" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          <p className="text-foreground font-medium text-lg leading-relaxed">
-            {fullAddress}
-          </p>
+          {isEditingAddress ? (
+            <Textarea
+              value={editedAddress}
+              onChange={(e) => setEditedAddress(e.target.value)}
+              className="text-foreground font-medium text-base leading-relaxed min-h-[80px] resize-none"
+              placeholder="Enter the correct address..."
+              autoFocus
+            />
+          ) : (
+            <p className="text-foreground font-medium text-lg leading-relaxed">
+              {displayAddress}
+            </p>
+          )}
         </div>
 
         {/* Coordinates */}
@@ -212,10 +279,10 @@ export const LocationPicker = ({
         </div>
 
         {/* Copy All Button */}
-        {address.formattedAddress && (
+        {displayAddress && !isEditingAddress && (
           <button
             onClick={() => copyToClipboard(
-              `Address: ${address.formattedAddress}\nLatitude: ${coordinates.lat.toFixed(6)}\nLongitude: ${coordinates.lng.toFixed(6)}`,
+              `Address: ${displayAddress}\nLatitude: ${coordinates.lat.toFixed(6)}\nLongitude: ${coordinates.lng.toFixed(6)}`,
               "Location details"
             )}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
@@ -227,7 +294,11 @@ export const LocationPicker = ({
       </div>
 
       {/* Confirm Button */}
-      <Button onClick={handleConfirm} className="h-12 text-base font-medium" disabled={!address.formattedAddress}>
+      <Button 
+        onClick={handleConfirm} 
+        className="h-12 text-base font-medium" 
+        disabled={!displayAddress || isEditingAddress}
+      >
         <Check className="w-5 h-5 mr-2" />
         Confirm Location
       </Button>
